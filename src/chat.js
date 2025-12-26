@@ -11,7 +11,8 @@ import { MESSAGE_ROLES } from './constants.js'
 
 /**
  * @typedef {Object} ChatCallbacks
- * @property {(messages: Array) => void} [onMessagesUpdate] - Called when messages array should be updated
+ * @property {(message: Object) => void} [onMessageAdd] - Called when a new message is added
+ * @property {(index: number, updatedMsg: Object) => void} [onMessageUpdate] - Called when an existing message is updated
  * @property {(sessionId: string) => void} [onSessionUpdate] - Called when session ID is updated
  */
 
@@ -192,7 +193,7 @@ export function sendMessage({ text, html }) {
           timestamp: new Date().toISOString()
         }
         currentSession.messages = [...currentSession.messages, userMessage]
-        currentSession.callbacks.onMessagesUpdate?.([...currentSession.messages])
+        currentSession.callbacks.onMessageAdd?.(userMessage)
 
         await sleep(200)
 
@@ -202,7 +203,7 @@ export function sendMessage({ text, html }) {
           loading: true
         }
         currentSession.messages = [...currentSession.messages, loadingMessage]
-        currentSession.callbacks.onMessagesUpdate?.([...currentSession.messages])
+        currentSession.callbacks.onMessageAdd?.(loadingMessage)
 
         const url = new URL(currentSession.sseUrl)
         if (currentSession.sessionId) {
@@ -246,39 +247,36 @@ export function sendMessage({ text, html }) {
               currentSession.sessionId = data.sessionId
               currentSession.requestId = data.requestId
             } else if (data.message !== undefined) {
-              let messages = currentSession.messages
-
               // If streamId changes, start a new assistant message
               if (data.streamId !== undefined) {
                 if (currentSession.lastStreamId === undefined) {
                   currentSession.lastStreamId = data.streamId
                 } else if (data.streamId !== currentSession.lastStreamId) {
                   currentSession.lastStreamId = data.streamId
-                  messages = [
-                    ...messages,
-                    {
-                      role: MESSAGE_ROLES.BOT,
-                      text: '',
-                      loading: true
-                    }
-                  ]
+                  const newBotMessage = {
+                    role: MESSAGE_ROLES.BOT,
+                    text: '',
+                    loading: true
+                  }
+                  currentSession.messages = [...currentSession.messages, newBotMessage]
+                  currentSession.callbacks.onMessageAdd?.(newBotMessage)
                 }
               }
 
               // Update the last message with new content
-              currentSession.messages = messages.map((msg, index) => {
-                if (index === messages.length - 1) {
-                  return {
-                    ...msg,
-                    loading: false,
-                    text: (msg.text || '') + data.message,
-                    done: data.done ?? msg.done
-                  }
-                }
-                return msg
-              })
+              const lastIndex = currentSession.messages.length - 1
+              const lastMsg = currentSession.messages[lastIndex]
+              const updatedMsg = {
+                ...lastMsg,
+                loading: false,
+                text: (lastMsg.text || '') + data.message,
+                done: data.done ?? lastMsg.done
+              }
+              currentSession.messages = currentSession.messages.map((msg, index) =>
+                index === lastIndex ? updatedMsg : msg
+              )
 
-              currentSession.callbacks.onMessagesUpdate?.([...currentSession.messages])
+              currentSession.callbacks.onMessageUpdate?.(lastIndex, updatedMsg)
 
               if (data.done) {
                 resolve(currentSession.sessionId)
@@ -289,17 +287,17 @@ export function sendMessage({ text, html }) {
               currentSession.requestId = data.requestId ?? currentSession.requestId
             } else if (data.error) {
               const errorMessage = 'Failed to connect to the system'
-              currentSession.messages = currentSession.messages.map((msg, index) => {
-                if (index === currentSession.messages.length - 1) {
-                  return {
-                    ...msg,
-                    loading: false,
-                    errorText: errorMessage
-                  }
-                }
-                return msg
-              })
-              currentSession.callbacks.onMessagesUpdate?.([...currentSession.messages])
+              const lastIndex = currentSession.messages.length - 1
+              const lastMsg = currentSession.messages[lastIndex]
+              const updatedMsg = {
+                ...lastMsg,
+                loading: false,
+                errorText: errorMessage
+              }
+              currentSession.messages = currentSession.messages.map((msg, index) =>
+                index === lastIndex ? updatedMsg : msg
+              )
+              currentSession.callbacks.onMessageUpdate?.(lastIndex, updatedMsg)
               reject(new Error(errorMessage))
             }
           },
@@ -311,18 +309,18 @@ export function sendMessage({ text, html }) {
       } catch (error) {
         console.error('Failed to send message: ', error)
         const errorMessage = 'Failed to connect to the system'
-        currentSession.messages = currentSession.messages.map((msg, index) => {
-          if (index === currentSession.messages.length - 1) {
-            return {
-              ...msg,
-              loading: false,
-              errorText: errorMessage,
-              done: true
-            }
-          }
-          return msg
-        })
-        currentSession.callbacks.onMessagesUpdate?.([...currentSession.messages])
+        const lastIndex = currentSession.messages.length - 1
+        const lastMsg = currentSession.messages[lastIndex]
+        const updatedMsg = {
+          ...lastMsg,
+          loading: false,
+          errorText: errorMessage,
+          done: true
+        }
+        currentSession.messages = currentSession.messages.map((msg, index) =>
+          index === lastIndex ? updatedMsg : msg
+        )
+        currentSession.callbacks.onMessageUpdate?.(lastIndex, updatedMsg)
         reject(error)
       }
     })()
