@@ -1,0 +1,50 @@
+{
+  "name": "@origonai/web-chat-sdk",
+  "version": "0.1.0",
+  "description": "Origon Web Chat SDK - Core chat functionality without UI dependencies",
+  "type": "module",
+  "main": "./dist/origon-chat-sdk.js",
+  "module": "./dist/origon-chat-sdk.js",
+  "exports": {
+    ".": {
+      "import": "./dist/origon-chat-sdk.js"
+    },
+    "./src": {
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/origonai/web-chat-sdk.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "deploy": "yarn build && npm publish"
+  },
+  "keywords": [
+    "chat",
+    "sdk",
+    "origon",
+    "messaging"
+  ],
+  "author": "Origon",
+  "license": "MIT",
+  "dependencies": {
+    "@microsoft/fetch-event-source": "^2.0.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "peerDependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
