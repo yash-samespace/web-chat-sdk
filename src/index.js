@@ -21,7 +21,8 @@
  * // Set up callbacks for state updates
  * setCallbacks({
  *   onMessage: (msg) => console.log('New message:', msg),
- *   onMessagesUpdate: (messages) => updateUI(messages),
+ *   onMessageAdd: (message) => updateUI(message),
+ *   onMessageUpdate: (index, updatedMsg) => updateUI(updatedMsg),
  *   onTyping: (isTyping) => showTypingIndicator(isTyping),
  *   onError: (error) => console.error(error)
  * })

@@ -34,11 +34,14 @@ import {
 
 // 1. Set up callbacks for state updates
 setCallbacks({
-  onMessagesUpdate: (messages) => {
-    console.log('Messages updated:', messages)
+  onMessageAdd: (message) => {
+    console.log('New message:', message)
+  },
+  onMessageUpdate: (index, updatedMsg) => {
+    console.log('Message updated at index:', index, updatedMsg)
   },
   onTyping: (isTyping) => {
-    console.log('Agent is typing:', isTyping)
+    console.log('Live Agent is typing:', isTyping)
   },
   onSessionUpdate: (sessionId) => {
     console.log('Session ID:', sessionId)
@@ -143,7 +146,8 @@ Sets callback functions for chat events.
 
 ```javascript
 setCallbacks({
-  onMessagesUpdate: (messages: Message[]) => void,
+  onMessageAdd: (message: Message) => void,
+  onMessageUpdate: (index: number, updatedMsg: Message) => void,
   onTyping: (isTyping: boolean) => void,
   onLiveAgentMode: (isLiveAgent: boolean) => void,
   onSessionUpdate: (sessionId: string) => void
@@ -309,7 +313,8 @@ interface Message {
 
 ```typescript
 interface ChatCallbacks {
-  onMessagesUpdate?: (messages: Message[]) => void
+  onMessageAdd?: (message: Message) => void
+  onMessageUpdate?: (index: number, updatedMsg: Message) => void
   onTyping?: (isTyping: boolean) => void
   onLiveAgentMode?: (isLiveAgent: boolean) => void
   onSessionUpdate?: (sessionId: string) => void
@@ -367,7 +372,8 @@ import {
 
 // Set up both chat and call callbacks
 setCallbacks({
-  onMessagesUpdate: (messages) => updateChatUI(messages),
+  onMessageAdd: (message) => addMessageToUI(message),
+  onMessageUpdate: (index, updatedMsg) => updateMessageInUI(index, updatedMsg),
   onSessionUpdate: (sessionId) => saveSession(sessionId)
 })
 
