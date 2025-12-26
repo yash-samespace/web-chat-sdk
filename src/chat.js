@@ -314,7 +314,7 @@ export function sendMessage({ text, html }) {
         const updatedMsg = {
           ...lastMsg,
           loading: false,
-          errorText: errorMessage,
+          errorText: lastMsg.done ? undefined : error.message || errorMessage,
           done: true
         }
         currentSession.messages = currentSession.messages.map((msg, index) =>
