@@ -80,17 +80,22 @@ export async function getMessages(sessionId) {
 async function fetchRequest(pathname, method = 'GET', body = null) {
   const credentials = getCredentials()
 
-  const endpoint = credentials?.endpoint
+  const { endpoint, token } = credentials || {}
   if (!endpoint) {
     throw new Error(INITIALIZATION_ERROR)
   }
 
   const url = `${endpoint}${pathname}`
 
+  const headers = {
+    'Content-Type': 'application/json'
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
   return fetch(url, {
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     method,
     body: body ? JSON.stringify(body) : null
   })
