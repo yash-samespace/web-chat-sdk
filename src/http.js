@@ -80,7 +80,8 @@ export async function getMessages(sessionId) {
 async function fetchRequest(pathname, method = 'GET', body = null) {
   const credentials = getCredentials()
 
-  if (!credentials?.endpoint) {
+  const endpoint = credentials?.endpoint
+  if (!endpoint) {
     throw new Error(INITIALIZATION_ERROR)
   }
 
