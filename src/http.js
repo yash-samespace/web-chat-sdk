@@ -3,33 +3,10 @@
  * Handles all HTTP requests without depending on external state
  */
 
-import { getExternalId } from './chat.js'
+import { getCredentials, getExternalId } from './chat.js'
 
 const AUTHENTICATION_ERROR = 'Something went wrong initializing the chat'
 const INITIALIZATION_ERROR = 'Chat SDK not initialized'
-
-// Module-level configuration
-let _config = {
-  endpoint: null
-}
-
-/**
- * Configure the API service with endpoint
- * @param {{ endpoint: string }} credentials
- */
-export function configure(credentials) {
-  _config = {
-    endpoint: credentials.endpoint
-  }
-}
-
-/**
- * Get current configuration
- * @returns {{ endpoint: string | null }}
- */
-export function getConfig() {
-  return { ..._config }
-}
 
 /**
  * Authenticate with the chat service
@@ -54,9 +31,6 @@ export async function authenticate(payload) {
 
   const res = await response.json()
   const data = res.data
-
-  // Store endpoint for subsequent requests
-  configure({ endpoint })
 
   return data
 }
@@ -104,9 +78,9 @@ export async function getMessages(sessionId) {
  * @returns {Promise<Response>}
  */
 async function fetchRequest(pathname, method = 'GET', body = null) {
-  const { endpoint } = _config
+  const credentials = getCredentials()
 
-  if (!endpoint) {
+  if (!credentials?.endpoint) {
     throw new Error(INITIALIZATION_ERROR)
   }
 
