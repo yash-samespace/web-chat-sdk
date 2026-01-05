@@ -8,12 +8,23 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { getMessages, authenticate } from './http.js'
 import { getDeviceId, sleep } from './utils.js'
 import { MESSAGE_ROLES } from './constants.js'
+import {
+  connectSocket,
+  send as socketSend,
+  disconnect as disconnectSocket,
+  isConnected as isSocketConnected
+} from './socket.js'
 
 /**
  * @typedef {Object} ChatCallbacks
  * @property {(message: Object) => void} [onMessageAdd] - Called when a new message is added
  * @property {(index: number, updatedMsg: Object) => void} [onMessageUpdate] - Called when an existing message is updated
  * @property {(sessionId: string) => void} [onSessionUpdate] - Called when session ID is updated
+ * @property {(transport: TransportType) => void} [onTransportUpdate] - Called when transport type changes
+ */
+
+/**
+ * @typedef {'sse' | 'socket'} TransportType
  */
 
 /**
@@ -25,6 +36,7 @@ import { MESSAGE_ROLES } from './constants.js'
  * @property {string} [lastStreamId]
  * @property {Array} messages
  * @property {ChatCallbacks} callbacks
+ * @property {TransportType} transport
  */
 
 /**
@@ -43,7 +55,8 @@ function createSession(callbacks = {}) {
     abortController: undefined,
     lastStreamId: undefined,
     messages: [],
-    callbacks
+    callbacks,
+    transport: 'sse'
   }
 }
 
@@ -161,6 +174,7 @@ function cleanup() {
   if (currentSession.abortController) {
     currentSession.abortController.abort()
   }
+  disconnectSocket()
 
   const { callbacks, credentials } = currentSession
   currentSession = createSession(callbacks)
@@ -174,6 +188,37 @@ export function getExternalId() {
     return currentSession.credentials.externalId
   }
   return getDeviceId()
+}
+
+/**
+ * Add a message to the chat
+ * @param {Object} message - The message object to add
+ */
+export function addMessage(message) {
+  currentSession.messages = [...currentSession.messages, message]
+  currentSession.callbacks.onMessageAdd?.(message)
+}
+
+export function toggleTypingStatus(isTyping) {
+  currentSession.callbacks.onTyping?.(isTyping)
+}
+
+/**
+ * Set the transport type
+ * @param {TransportType} transport
+ */
+export function setTransport(transport) {
+  console.log('Setting transport to:', transport)
+  currentSession.transport = transport
+  currentSession.callbacks.onTransportUpdate?.(transport)
+}
+
+/**
+ * Get current transport type
+ * @returns {TransportType}
+ */
+export function getTransport() {
+  return currentSession.transport
 }
 
 /**
@@ -192,18 +237,28 @@ export function sendMessage({ text, html }) {
           html,
           timestamp: new Date().toISOString()
         }
-        currentSession.messages = [...currentSession.messages, userMessage]
-        currentSession.callbacks.onMessageAdd?.(userMessage)
-
+        addMessage(userMessage)
         await sleep(200)
+
+        // If transport is socket and socket is connected, use socket
+        if (currentSession.transport === 'socket' && isSocketConnected()) {
+          socketSend({
+            type: 'message',
+            data: {
+              text,
+              html
+            }
+          })
+          resolve(currentSession.sessionId)
+          return
+        }
 
         const loadingMessage = {
           role: MESSAGE_ROLES.BOT,
           text: '',
           loading: true
         }
-        currentSession.messages = [...currentSession.messages, loadingMessage]
-        currentSession.callbacks.onMessageAdd?.(loadingMessage)
+        addMessage(loadingMessage)
 
         const url = new URL(currentSession.sseUrl)
         if (currentSession.sessionId) {
@@ -239,13 +294,19 @@ export function sendMessage({ text, html }) {
               throw new Error('Failed to send message')
             }
           },
-          onmessage: (event) => {
-            console.log('Event: ', event)
-            const data = JSON.parse(event.data)
+          onmessage: (response) => {
+            // console.log('Event: ', response)
+            const data = JSON.parse(response.data)
 
-            if (data.status === 'connected') {
+            if (response.event === 'connected') {
               currentSession.sessionId = data.sessionId
               currentSession.requestId = data.requestId
+            } else if (response.event === 'upgrade_to_websocket') {
+              console.log('Upgrade to websocket: ', data)
+              connectSocket({
+                sessionId: currentSession.sessionId,
+                requestId: data.requestId
+              })
             } else if (data.message !== undefined) {
               // If streamId changes, start a new assistant message
               if (data.streamId !== undefined) {
@@ -258,8 +319,7 @@ export function sendMessage({ text, html }) {
                     text: '',
                     loading: true
                   }
-                  currentSession.messages = [...currentSession.messages, newBotMessage]
-                  currentSession.callbacks.onMessageAdd?.(newBotMessage)
+                  addMessage(newBotMessage)
                 }
               }
 
@@ -270,6 +330,7 @@ export function sendMessage({ text, html }) {
                 ...lastMsg,
                 loading: false,
                 text: (lastMsg.text || '') + data.message,
+                sources: data.sources,
                 done: data.done ?? lastMsg.done
               }
               currentSession.messages = currentSession.messages.map((msg, index) =>
